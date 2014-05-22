@@ -64,6 +64,7 @@ $groupLogo = XML_SVG_Group::getNew($groupID, 16);
 setTransform($groupLogo);
 //$logoImage = XML_SVG_Image::getNew('url(./powered-by.png)', 1608, 625);
 $logoImage = XML_SVG_Image::getNew(false, 300, 105);
+$logoImage->x = "10";
 $logoImage->href = "data:image/png;base64," . get_logo();
 $logoImage->preserveAspectRatio="none";
 $groupLogo->appendChild($logoImage);
@@ -164,14 +165,19 @@ $content->appendChild($groupStunts);
 
 /* PHYSICAL STRESS section */
 $groupPhysicalStress = mkSectionGroup(array("PHYSICAL STRESS", "(Physique)"), 0, $groupExtras, 296, 64);
+$groupPhysicalStress->appendChild(mkStressBoxes(0,30,296,34,2));
 $content->appendChild($groupPhysicalStress);
 
 /* MENTAL STRESS section */
 $groupMentalStress = mkSectionGroup(array("MENTAL STRESS", "(Will)"), 0, $groupPhysicalStress, 296, 64);
+$groupMentalStress->appendChild(mkStressBoxes(0,30,296,34,2));
 $content->appendChild($groupMentalStress);
 
 /* CONSEQUENCES section */
 $groupConsequences = mkSectionGroup("CONSEQUENCES", $groupPhysicalStress, $groupStunts);
+$groupConsequences->appendChild(mkStressBox(2,'mild',0,30,610,36));
+$groupConsequences->appendChild(mkStressBox(4,'moderate',0,70,610,36));
+$groupConsequences->appendChild(mkStressBox(6,'severe',0,110,610,36));
 $content->appendChild($groupConsequences);
 
 // all done.
@@ -288,6 +294,33 @@ function mkClippedRect($labels, $x, $y, $width, $height = BOX_HEIGHT, $corner = 
 }
 
 /**
+ * make a group of stress boxes
+ */
+function mkStressBoxes($x, $y, $width, $height, $max = 2) {
+  $boxWidth = ($width - 12)/4;
+  $xshift = $boxWidth + 4;
+  $boxGroup = XML_SVG_Group::getNew($x, $y);
+  setTransform($boxGroup);
+  foreach (range(1,4) as $shifts) {
+    $x = ($shifts-1) * $xshift;
+    $boxGroup->appendChild(mkStressBox($shifts,'',$x,0,$boxWidth,$height, $shifts <= $max));
+  }
+  return $boxGroup;
+}
+
+/**
+ * Create an empty rectangle, with a number just to the left and above.
+ */
+function mkStressBox($number, $label, $right_of, $below_of, $width, $height, $active = true) {
+  $group = XML_SVG_Group::getNew($right_of, $below_of);
+  setTransform($group);
+  $box = mkOpenBox($label, 15, 3, $width-15, $height-3, $active);
+  $group->appendChild($box);
+  $group->appendChild(setTextProperties(mkLabel($number, 0, 0, 21), "stress-number"));
+  return $group;
+}
+  
+/**
  * Create an empty rectangle, with an optional light text label.
  *
  * @param $label text label. To omit the label, set this to "" or something 
@@ -300,7 +333,7 @@ function mkClippedRect($labels, $x, $y, $width, $height = BOX_HEIGHT, $corner = 
  *        height.
  * @return XML_SVG_Group containing a Rect and optionally a Text.
  */
-function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT) {
+function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT, $active = true) {
 	/*
 	if ($dx != 0) {
 		$dx += BOX_MARGIN;
@@ -323,7 +356,7 @@ function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT) {
 	$rect = XML_SVG_Rect::getNew(0,0, $width, $height);
 	$rect->fill = "none";
 	$rect->stroke_width = 2;
-	$rect->stroke = "#000000";
+	$rect->stroke = $active ? "#000000" : "#999999";
 	$rect->stroke_linejoin = "round";
 	$rect->stroke_linecap = "butt";
 	$group->appendChild($rect);
@@ -373,6 +406,7 @@ function mkLabel($label, $right_of, $below_of, $width, $height=BOX_HEIGHT) {
 
 function mkGuideBox($x, $y, $width, $height) {
 	$group =  XML_SVG_Group::getNew();
+	return $group;
 	$group->class = "guide-box";
 	$group->transform = "translate($x,$y)";
 
@@ -405,25 +439,37 @@ function setTextProperties(XML_SVG_Element &$element, $class) {
 		$element->fill = "white";
 		$element->font_family = "Montserrat, sans-serif";
 		$element->font_size = "15pt";
-		$element->alignment_baseline = "before-edge";
+    $element->y = "17";
+		//$element->alignment_baseline = "text-before-edge";
 		break;
 	case 'section-subheader':
 		$element->fill = "white";
 		$element->font_family = "Montserrat, sans-serif";
 		$element->font_size = "13pt";
-		$element->alignment_baseline = "before-edge";
+    $element->y = "15";
+		//$element->alignment_baseline = "before-edge";
 		break;
 	case 'box-label':
 		$element->fill = "#ccc";
 		$element->font_family = "Montserrat, sans-serif";
 		$element->font_size = "13pt";
-		$element->alignment_baseline = "before-edge";
+    $element->y = "15";
+		//$element->alignment_baseline = "before-edge";
 		break;
 	case 'label':
 		$element->fill = "#000";
 		$element->font_family = "Montserrat, sans-serif";
 		$element->font_size = "13pt";
-		$element->alignment_baseline = "before-edge";
+    $element->y = "15";
+		//$element->alignment_baseline = "before-edge";
+		break;
+	case 'stress-number':
+		$element->fill = "#000";
+		$element->font_family = "Montserrat, sans-serif";
+		$element->font_size = "13pt";
+    $element->font_weight = "bold";
+    $element->y = "15";
+		//$element->alignment_baseline = "before-edge";
 		break;
 	default:
 		// do nothing
