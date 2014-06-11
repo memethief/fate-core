@@ -1,0 +1,27 @@
+InfoBegin
+InfoKey: Title
+InfoValue: 
+InfoBegin
+InfoKey: Author
+InfoValue: 
+InfoBegin
+InfoKey: Subject
+InfoValue: 
+InfoBegin
+InfoKey: Keywords
+InfoValue: 
+InfoBegin
+InfoKey: ModDate
+InfoValue: D:20140526160000-05'00'
+InfoBegin
+InfoKey: CreationDate
+InfoValue: D:20140526160100-05'00'
+InfoBegin
+InfoKey: Creator
+InfoValue: 
+InfoBegin
+InfoKey: Producer
+InfoValue: 
+InfoBegin
+InfoKey: Trapped
+InfoValue: 

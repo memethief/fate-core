@@ -1,4 +1,8 @@
 <?php 
+/**
+ * @author David Leaman <fated@memethief.com>
+ * 
+ */
 
 $dlmlib_xml_svg = './XML_SVG';
 set_include_path(".:$dlmlib_xml_svg:".get_include_path());
@@ -112,6 +116,7 @@ $content->appendChild($groupAspects);
  * .: gutter is 3px
  */
 $widthSkills = BOX_WIDTH_TWOTHIRDS;
+$skillUnitHeight = 22.3;
 $skillBoxHeight = 44.6;
 $skillGutter = 3; // vertical gap
 $skillBoxSkip = $skillBoxHeight+$skillGutter;
@@ -129,32 +134,32 @@ setTransform($groupModes);
 $groupSkillRanks = XML_SVG_Group::getNew(0,BOX_SKIPY);
 setTransform($groupSkillRanks);
 $groupSkillRanks->appendChildren(array(
-	mkLabel("Superb (+5)" ,0,0*$skillBoxSkip,$skillFullWidth, $skillBoxSkip, true),
-	mkLabel("Great (+4)"  ,0,1*$skillBoxSkip,$skillFullWidth, $skillBoxSkip, true),
-	mkLabel("Good (+3)"   ,0,2*$skillBoxSkip,$skillFullWidth, $skillBoxSkip, true),
-	mkLabel("Fair (+2)"   ,0,3*$skillBoxSkip,$skillFullWidth, $skillBoxSkip, true),
-	mkLabel("Average (+1)",0,4*$skillBoxSkip,$skillFullWidth, $skillBoxSkip, true),
+	mkLabel("Superb (+5)" ,0,0*$skillBoxSkip,$skillFullWidth-2*$skillModeSkip, 0.5*$skillBoxSkip, true),
+	mkLabel("Great (+4)"  ,0,1*$skillBoxSkip,$skillFullWidth-$skillModeSkip, 0.5*$skillBoxSkip, true),
+	mkLabel("Good (+3)"   ,0,2*$skillBoxSkip,$skillFullWidth, 0.5*$skillBoxSkip, true),
+	mkLabel("Fair (+2)"   ,$skillRankSkip,3.25*$skillBoxSkip,$skillFullWidth-$skillRankSkip, 0.5*$skillBoxSkip, true),
+	mkLabel("Average (+1)",$skillRankSkip+$skillModeSkip,4.25*$skillBoxSkip,$skillFullWidth-$skillRankSkip-$skillModeSkip, 0.5*$skillBoxSkip, true),
 ));
 
 $groupSkillModeGood = XML_SVG_Group::getNew($skillRankSkip,0);
 setTransform($groupSkillModeGood);
 $groupSkillModeGood->appendChildren(array(
 	mkOpenBox("Good Mode", 0, 0, $skillModeWidth),
-  mkSkillModeSkills(0, BOX_SKIPY, 3),
+  mkSkillModeSkills(0, BOX_SKIPY, 3, true),
 ));
 
 $groupSkillModeFair = XML_SVG_Group::getNew($skillRankSkip+$skillModeSkip,0);
 setTransform($groupSkillModeFair);
 $groupSkillModeFair->appendChildren(array(
 	mkOpenBox("Fair Mode",0,0*$skillBoxSkip,$skillModeWidth),
-  mkSkillModeSkills(0, BOX_SKIPY, 2),
+  mkSkillModeSkills(0, BOX_SKIPY, 2, false),
 ));
 
 $groupSkillModeAverage = XML_SVG_Group::getNew($skillRankSkip+2*$skillModeSkip,0);
 setTransform($groupSkillModeAverage);
 $groupSkillModeAverage->appendChildren(array(
 	mkOpenBox("Average Mode",0,0*$skillBoxSkip,$skillModeWidth),
-  mkSkillModeSkills(0, BOX_SKIPY, 1),
+  mkSkillModeSkills(0, BOX_SKIPY, 1, true),
 ));
 
 $groupModes->appendChildren(array(
@@ -164,6 +169,15 @@ $groupModes->appendChildren(array(
 	$groupSkillModeAverage,
 ));
 $groupSkills->appendChildren($groupModes);
+
+// skill points
+$groupSkillPoints = XML_SVG_Group::getNew(0, 5.5*$skillBoxSkip);
+setTransform($groupSkillPoints);
+$groupSkillPoints->appendChildren(array(
+	mkLabel("Superb (+5)" ,0,0*$skillBoxSkip,$skillFullWidth-2*$skillModeSkip, 0.5*$skillBoxSkip, true),
+));
+$groupSkills->appendChild($groupSkillPoints);
+
 $content->appendChild($groupSkills);
 
 /* EXTRAS section */
@@ -220,10 +234,10 @@ print $doc->saveXML();
 function mkSectionGroup($titles, $right_of=null, $below_of=null, $width=null, $height=null) {
 	//error_log(__METHOD__ . " BEGIN");
 	
+  $titles = (array) $titles;
+  while (count($titles) < 2) $titles[] = "";
 	// Some default values
-	list($title, $subtitle) = is_array($titles)
-		? $titles
-		: array($titles, "");
+	list($title, $subtitle) = $titles;
 
 	$group = XML_SVG_Group::getNew(false, false, SECTION_MARGIN);
 	$group->id = "sectionGroup-" . str_replace(" ", "-", $title);
@@ -354,15 +368,18 @@ function mkStressBox($number, $label, $right_of, $below_of, $width, $height, $ac
 /**
  * Make three vertically-stacked boxes for skills
  */
-function mkSkillModeSkills($x, $y, $base) {
-  global $skillBoxSkip, $skillModeWidth;
+function mkSkillModeSkills($x, $y, $base, $even=false) {
+  global $skillBoxSkip, $skillModeWidth, $skillUnitHeight;
   $group = XML_SVG_Group::getNew(0,BOX_SKIPY);
   setTransform($group);
-  $skip = 5 - $base;
+  $skip = 4.5 - $base;
   $group->appendChildren(array(
-    mkOpenBox("Trained"    , 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
-    mkOpenBox("Focused"    , 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
-    mkOpenBox("Specialized", 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
+    //mkOpenBox("Trained"    , 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
+    //mkOpenBox("Focused"    , 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
+    //mkOpenBox("Specialized", 0, ($skip--)*$skillBoxSkip, $skillModeWidth, $skillBoxSkip),
+    mkOpenBox("Trained"    , 0, ($skip-0)*$skillBoxSkip, $skillModeWidth, 1.5*$skillBoxSkip, true, $even),
+    mkOpenBox("Focused"    , 0, ($skip-1)*$skillBoxSkip, $skillModeWidth, 1*$skillBoxSkip, true, !$even),
+    mkOpenBox("Specialized", 0, ($skip-1.5)*$skillBoxSkip, $skillModeWidth, 0.5*$skillBoxSkip, true, $even),
   ));
   return $group;
 }
@@ -380,7 +397,7 @@ function mkSkillModeSkills($x, $y, $base) {
  *        height.
  * @return XML_SVG_Group containing a Rect and optionally a Text.
  */
-function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT, $active = true) {
+function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT, $active = true, $shaded=false) {
 	/*
 	if ($dx != 0) {
 		$dx += BOX_MARGIN;
@@ -401,7 +418,7 @@ function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT, $
 	//$group->transform = "translate($x,$y)";
 
 	$rect = XML_SVG_Rect::getNew(0,0, $width, $height);
-	$rect->fill = "none";
+  $rect->fill = $shaded ? "#eee" : "none";
 	$rect->stroke_width = 2;
 	$rect->stroke = $active ? "#000000" : "#999999";
 	$rect->stroke_linejoin = "round";
