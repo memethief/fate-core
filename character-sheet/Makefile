@@ -20,5 +20,7 @@ dlmlib pear :
 
 # generate PDF metadata and apply it to the PDF
 # todo: parse this from SVG?
-%.meta: 
+%.meta: %.svg.php
+	php $< --meta > $@
+
 
