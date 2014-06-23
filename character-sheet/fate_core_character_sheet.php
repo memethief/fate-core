@@ -2,6 +2,7 @@
 /**
  * @author David Leaman <fated@memethief.com>
  * 
+ * @todo get rid of "setTransform"
  */
 
 // Metadata for insertion into PDFs
@@ -24,6 +25,12 @@ require_once ("XML/SVG.php");
 
 // @todo check for variant here and include appropriate preset
 require ("presets/standard.inc");
+
+// @todo implement this fully
+require ("includes/sections.inc");
+
+// @todo check for variant here and include appropriate layout
+require ("layouts/standard.inc");
 
 // MAIN BLOCK
 $options = getopt("", array("meta"));
@@ -55,6 +62,7 @@ function make_meta() {
 }
 
 function make_svg() {
+	/* First we set up some document-level stuff */
 	//global $dim;
 	$doc = XML_SVG_Document::getInstance();
 
@@ -77,45 +85,18 @@ function make_svg() {
 	setTransform($content);
 	$layer->appendChild($content);
 
-	/* "ID" section */
-	$groupID = mkSectionId(0,0,BOX_WIDTH_TWOTHIRDS,137);
-	$content->appendChild($groupID);
+	/* Now we create individual sections */
 
-	/* LOGO */
-	$groupLogo = mkSectionLogo($groupID, 16, BOX_WIDTH_THIRD, 137);
-	$content->appendChild($groupLogo);
-
-	/* "ASPECTS" section */
-	$groupAspects = mkSectionAspects(0, $groupID, BOX_WIDTH_THIRD, 171);
-	$content->appendChild($groupAspects);
-
-	/* SKILL MODES section */
-	$groupSkills = mkSectionSkillMode($groupAspects, $groupID, BOX_WIDTH_TWOTHIRDS, 295);
-	$content->appendChild($groupSkills);
-
-	/* EXTRAS section */
-	$groupExtras = mkSectionExtras(0, $groupAspects, BOX_WIDTH_THIRD, 136);
-	$content->appendChild($groupExtras);
-
-	/* STUNTS section */
-	/* PHYSICAL STRESS section */
-	/* MENTAL STRESS section */
-	/* CONSEQUENCES section */
-	$heightStress = 64;
-	$stunts_on_left = true;
-	if ($stunts_on_left) {
-		$groupStunts = mkSectionStunts(0, $groupExtras, BOX_WIDTH_THIRD, 137);
-		$groupPhysicalStress = mkSectionStressPhysical($groupExtras, $groupSkills, BOX_WIDTH_THIRD, $heightStress);
-		$groupMentalStress = mkSectionStressMental($groupPhysicalStress, $groupSkills, BOX_WIDTH_THIRD, $heightStress);
-		$groupConsequences = mkSectionConsequences($groupStunts, $groupPhysicalStress, BOX_WIDTH_TWOTHIRDS, $heightStress);
-	} else {
-		$groupStunts = mkSectionStunts($groupExtras, $groupSkills, BOX_WIDTH_TWOTHIRDS, 94);
-		$groupPhysicalStress = mkSectionStressPhysical(0, $groupExtras, BOX_WIDTH_QUARTER, $heightStress);
-		$groupMentalStress = mkSectionStressMental(0, $groupPhysicalStress, BOX_WIDTH_QUARTER, $heightStress);
-		$groupConsequences = mkSectionConsequences($groupPhysicalStress, $groupStunts, BOX_WIDTH_THREEQUARTERS, $heightStress);
-	}
 	$content->appendChildren(
-		$groupStunts, $groupPhysicalStress, $groupMentalStress, $groupConsequences
+		mkSection('id'),             /* "ID" section */
+		mkSection('logo'),           /* LOGO */
+		mkSection('aspects'),        /* "ASPECTS" section */
+		mkSection('skillmodes'),     /* SKILL MODES section */
+		mkSection('extras'),         /* EXTRAS section */
+		mkSection("stunts"),         /* STUNTS section */
+		mkSection("stressphysical"), /* PHYSICAL STRESS section */
+		mkSection("stressmental"),   /* MENTAL STRESS section */
+		mkSection("consequences")    /* CONSEQUENCES section */
 	);
 
 	// all done.
@@ -124,45 +105,109 @@ function make_svg() {
 
 /* UTILITY FUNCTIONS */
 
-function mkSectionGroup($titles, $right_of=null, $below_of=null, $width=null, $height=null) {
-	//error_log(__METHOD__ . " BEGIN");
+function dim_c10e($dimension, $source, $stack = array()) {
+	if (!isset($source[$dimension])) die("Undefined dimension");
+	$value = $source[$dimension];
+	if (!is_numeric($value)) {
+		// We have a reference. Let's resolve it.
+		global $boxes;
+		if (empty($boxes[$value])) die ("Invalid dimension reference");
+		$ref = $boxes[$value];
+		if (in_array($value, $stack)) die ("Infinite recursion detected");
+		$stack[] = $value;
+		switch ($dimension) {
+			case 'x': 
+				$value = dim_c10e('x', $ref, $stack) + dim_c10e('width', $ref, $stack) + SECTION_MARGINX;
+				break;
+			case 'y':
+				$value = dim_c10e('y', $ref, $stack) + dim_c10e('height', $ref, $stack) + SECTION_MARGINY;
+				break;
+			case 'width': 
+			case 'height':
+				$value = dim_c10e($dimension, $ref, $stack);
+				break;
+			default:
+				die ("Unrecognized dimension type");
+		}
+	}
+	switch ($dimension) {
+		case 'x': 
+		$value += SECTION_MARGINX;
+		break;
+		case 'y':
+		$value += SECTION_MARGINY;
+		break;
+	}
+	return $value;
+}
 
-	$titles = (array) $titles;
+/**
+ * Given the name of a section (as defined in sections.inc), return an
+ * XML_SVG_Element representing that section.
+ * 
+ * @param $section the name of the section, as used by the $boxes array
+ * @return XML_SVG_Element
+ */
+function mkSection($section) {
+	global $boxes;
+	if (empty($boxes[$section])) {
+		$msg = "Invalid box definition";
+		error_log(__METHOD__ . ":" . __LINE__ . ": $msg");
+		return XML_SVG_Text::getNew($msg);
+	}
+	$def = $boxes[$section];
+	foreach (array('x','y','width','height') as $dim) {
+		$def[$dim] = dim_c10e($dim,$def);
+	}
+	$boxMethod = "mkSection" . ucfirst($section);
+	if (!function_exists($boxMethod)) $boxMethod = "mkSectionGeneric";
+	return $boxMethod($def);
+}
+
+function mkSectionGeneric($def) {
+	$group = mkSectionGroup($def);
+	$group->appendChild(mkOpenBox(null,0,BOX_SKIPY,$def["width"], $def["height"]-BOX_SKIPY));
+	return $group;
+}
+
+function mkSectionGroup($def, $right_of=null, $below_of=null, $width=null, $height=null) {
+	//error_log(__METHOD__ . " BEGIN");
+	if (isset($def['label'])) {
+		$titles = (array) $def['label'];
+		$right_of = $def['x'];
+		$below_of = $def['y'];
+		$width = $def['width'];
+		$height = $def['height'];
+	} else {
+		$titles = (array) $def;
+	}
+
 	while (count($titles) < 2) $titles[] = "";
 	// Some default values
 	list($title, $subtitle) = $titles;
 
 	$group = XML_SVG_Group::getNew(false, false, SECTION_MARGIN);
 	$group->id = "sectionGroup-" . str_replace(" ", "-", $title);
-	//error_log("margin: (" . $group->marginx . ", " . $group->marginy . ")");
 	$group->marginx = SECTION_MARGIN;
 	$group->marginy = SECTION_MARGIN;
-	//error_log("margin: (" . $group->marginx . ", " . $group->marginy . ")");
 
 	// positioning
 	if ($right_of === null) $right_of = 0;
 	if ($below_of === null) $below_of = 0;
 	$group->right_of = $right_of;
 	$group->below_of = $below_of;
-	//error_log("about to setTransform");
 	setTransform($group);
 
 	// dimensions
-	//global $dim;
 	if ($width === null) $width = INNER_WIDTH - $group->x;
 	if ($height === null) $height = INNER_HEIGHT - $group->y;
-	//error_log("width: $width, height: $height");
 	$group->width = $width;
 	$group->height = $height;
-	//$group->appendChild(mkGuideBox(0, 0, $width, $height));
 
 	// Title bar
 	$group->appendChild(mkClippedRect($titles, 0, 0, $width));
-	//error_log("group properties: (" . var_export($group->properties,true) . ")");
-	//error_log("margin: (" . $group->marginx . ", " . $group->marginy . ")");
-	//error_log("groupID y/height/bottom/transform = {$group->y}/{$group->height}/{$group->bottom}/{$group->transform}");
-	//error_log(__METHOD__ . " END");
 
+	//error_log(__METHOD__ . " END");
 	return $group;
 }
 
@@ -258,14 +303,14 @@ function mkStressBox($number, $label, $right_of, $below_of, $width, $height, $ac
 	return $group;
 }
 
-function mkSectionId($x,$y,$width,$height) {
+function mkSectionId($def) {
 	/* "ID" section */
-	$widthLeft  = $width * 4/5;
-	$widthRight = $width - $widthLeft - BOX_MARGIN;
-	$groupID = mkSectionGroup("ID", $x, $y, $width, $height);
+	$widthLeft  = $def["width"] * 4/5;
+	$widthRight = $def["width"] - $widthLeft - BOX_MARGIN;
+	$groupID = mkSectionGroup($def);
 	$groupIDFields = XML_SVG_Group::getNew(0, BOX_HEADER_SKIPY);
 	$groupIDFields->id = "groupIDFields";
-	$heightFields = $height - BOX_HEADER_SKIPY;
+	$heightFields = $def["height"] - BOX_HEADER_SKIPY;
 	$heightName = BOX_HEIGHT;
 	$heightDescription = $heightFields - BOX_SKIPY;
 	setTransform($groupIDFields);
@@ -278,130 +323,105 @@ function mkSectionId($x,$y,$width,$height) {
 }
 
 /* LOGO */
-function mkSectionLogo($x, $y, $width, $height) {
-	$groupLogo = XML_SVG_Group::getNew($x, 16);
+function mkSectionLogo($def) {
+	$groupLogo = XML_SVG_Group::getNew($def["x"], $def["y"]);
 	setTransform($groupLogo);
-	$logoImage = XML_SVG_Image::getNew(false, 300, 105);
-	$logoImage->x = "10";
+	//$logoImage = XML_SVG_Image::getNew(false, 300, 105);
+	$logoImage = XML_SVG_Image::getNew(false, $def["width"], $def["height"]);
+	//$logoImage->x = "10";
 	$logoImage->href = "data:image/png;base64," . get_logo();
-	$logoImage->preserveAspectRatio="none";
+	$logoImage->preserveAspectRatio="xMidYMid";
 	$groupLogo->appendChild($logoImage);
 	return $groupLogo;
 }
 
 /* "ASPECTS" section */
-function mkSectionAspects($x, $y, $width, $height) {
-	$groupAspects = mkSectionGroup("ASPECTS", $x, $y, $width, $height);
-	setTransform($groupAspects);
-	$groupAspectsFields = XML_SVG_Group::getNew(0, BOX_SKIPY);
-	setTransform($groupAspectsFields);
+function mkSectionAspects($def) {
+	$group = mkSectionGroup($def);
+	setTransform($group);
+	$groupFields = XML_SVG_Group::getNew(0, BOX_SKIPY);
+	setTransform($groupFields);
 	$aspectFields = array(
-			mkOpenBox("High Concept", 0, 0, $width, 21),
-			mkOpenBox("Trouble", 0, 30, $width, 21),
-			mkOpenBox("", 0, 60, $width, 21),
-			mkOpenBox("", 0, 90, $width, 21),
-			mkOpenBox("", 0, 120, $width, 21),
+			mkOpenBox("High Concept", 0, 0, $def["width"], 21),
+			mkOpenBox("Trouble", 0, 30, $def["width"], 21),
+			mkOpenBox("", 0, 60, $def["width"], 21),
+			mkOpenBox("", 0, 90, $def["width"], 21),
+			mkOpenBox("", 0, 120, $def["width"], 21),
 			);
-	$groupAspectsFields->appendChildren($aspectFields);
-	$groupAspects->appendChild($groupAspectsFields);
-	return $groupAspects;
-}
-
-/* "EXTRAS" section */
-function mkSectionExtras($x, $y, $width, $height) {
-	$group = mkSectionGroup("EXTRAS", $x, $y, $width, $height);
-	$group->appendChild(mkOpenBox(null,0,BOX_SKIPY,$width, $height-BOX_SKIPY));
-	return $group;
-}
-
-/* "STUNTS" section */
-function mkSectionStunts($x, $y, $width, $height) {
-	//$boxWidth = BOX_WIDTH_THREEQUARTERS;
-	$boxWidth = $width;
-	$overlap = $width - $boxWidth;
-	$group = mkSectionGroup("STUNTS", $x, $y, $width, $height);
-	$group->appendChild(mkOpenBox(null,$overlap,BOX_SKIPY,$boxWidth, $height-BOX_SKIPY));
+	$groupFields->appendChildren($aspectFields);
+	$group->appendChild($groupFields);
 	return $group;
 }
 
 /* PHYSICAL STRESS section */
-function mkSectionStressPhysical($x, $y, $width, $height) {
-	$boxHeight = $height - BOX_SKIPY;
-	$group = mkSectionGroup(
-		array("PHYSICAL STRESS", /*"(Physique)"*/), 
-		$x, $y, $width, $height);
-	$group->appendChild(mkStressBoxes(0,BOX_SKIPY,$width,$boxHeight,2));
+function mkSectionStressPhysical($def) {
+	$group = mkSectionGroup($def);
+	$boxHeight = $def["height"] - BOX_SKIPY;
+	$group->appendChild(mkStressBoxes(0,BOX_SKIPY,$def["width"],$boxHeight,2));
 	return $group;
 }
 
 /* MENTAL STRESS section */
-function mkSectionStressMental($x, $y, $width, $height) {
-	$boxHeight = $height - BOX_SKIPY;
-	$group = mkSectionGroup(
-		array("MENTAL STRESS", /*"(Will)"*/), 
-		$x, $y, $width, $height);
-	$group->appendChild(mkStressBoxes(0,BOX_SKIPY,$width,$boxHeight,2));
+function mkSectionStressMental($def) {
+	$group = mkSectionGroup($def);
+	$boxHeight = $def["height"] - BOX_SKIPY;
+	$group->appendChild(mkStressBoxes(0,BOX_SKIPY,$def["width"],$boxHeight,2));
 	return $group;
 }
 
 /* "CONSEQUENCES" section */
-function mkSectionConsequences($x, $y, $width, $height) {
-	$group = mkSectionGroup("CONSEQUENCES", $x, $y, $width, $height);
-	$boxWidth = ($width - 2*BOX_MARGIN) / 3;
-	$boxHeight = $height - BOX_SKIPY;
-	$skipx = $boxWidth + BOX_MARGIN;
+function mkSectionConsequences($def) {
+	$group = mkSectionGroup($def);
+	if ($def["width"] == BOX_WIDTH_TWOTHIRDS) {
+	$boxWidth = ($def["width"] - 2*BOX_MARGINX)/3;
+	$boxHeight = $def["height"] - BOX_SKIPY;
+	$skipx = $boxWidth + BOX_MARGINX;
 	$groupBoxes = XML_SVG_Group::getNew(0,BOX_SKIPY);
 	setTransform($groupBoxes);
 	$groupBoxes->appendChild(mkStressBox(2,'mild'    , 0*$skipx,0,$boxWidth,$boxHeight));
 	//$groupBoxes->appendChild(mkStressBox(2,'mild'  , 0*$skipx,BOX_SKIPY,$boxWidth, $boxHeight));
 	$groupBoxes->appendChild(mkStressBox(4,'moderate', 1*$skipx,0,$boxWidth,$boxHeight));
 	$groupBoxes->appendChild(mkStressBox(6,'severe'  , 2*$skipx,0,$boxWidth,$boxHeight));
+	} else {
+	$boxWidth = $def["width"];
+	$boxGroupHeight = $def["height"] - BOX_SKIPY;
+	$boxHeight = ($boxGroupHeight - 2*BOX_MARGINY) / 3;
+	$skipy = $boxHeight + BOX_MARGINY;
+	$groupBoxes = XML_SVG_Group::getNew(0,BOX_SKIPY);
+	setTransform($groupBoxes);
+	$groupBoxes->appendChild(mkStressBox(2,'mild'    , 0,0*$skipy,$boxWidth,$boxHeight));
+	//$groupBoxes->appendChild(mkStressBox(2,'mild'  , 0*$skipx,BOX_SKIPY,$boxWidth, $boxHeight));
+	$groupBoxes->appendChild(mkStressBox(4,'moderate', 0,1*$skipy,$boxWidth,$boxHeight));
+	$groupBoxes->appendChild(mkStressBox(6,'severe'  , 0,2*$skipy,$boxWidth,$boxHeight));
+	}
 	$group->appendChild($groupBoxes);
 	return $group;
 }
 
-function mkSectionSkillMode($x, $y, $width, $height) {
-	global $skillBoxSkip, $skillModeWidth, $skillUnitHeight;
 	/* SKILL MODES section */
-	/*
-	 * width = 610
-	 * 4 columns
-	 * 3*box_margin = 27
-	 * total column width = 583 ~ 146 * 4 = 115 + 156*3
-	 * height = 171
-	 * inner height = 141 = 23.5*6
-	 * 6 rows
-	 * total row height = 21*6 + 15 = 21*6 + 3*5
-	 * .: gutter is 3px
-	 */
-	// @todo dynamic dimensions: start with width and height
-	// Width and height of the whole section:
-	$sectionWidth = $width;
-	$sectionHeight = $height;
+function mkSectionSkillModes($def) {
+	global $skillBoxSkip, $skillModeWidth, $skillUnitHeight;
 	/* Height of one "unit" of skill box height. The actual skill boxes are
 	 * either one, two or three units high.
 	 */
-	//$skillBoxHeight = 44.6;
 	$skillGutter = 3; // vertical gap
-	//$heightSkills = 2*BOX_SKIPY + 5*$skillBoxHeight + 4*$skillGutter; // 30 + 21 + 5*30 = 201
 
-	$skillSubsectionHeight = $sectionHeight 
+	$skillSubsectionHeight = $def["height"] 
 		- BOX_HEADER_SKIPY
 		- BOX_SKIPY ; // subhead
 	$skillBoxHeight = ( $skillSubsectionHeight 
 		- (NUM_SKILL_RANKS-1)*$skillGutter
 		) / NUM_SKILL_RANKS; 
 	$skillBoxSkip = $skillBoxHeight+$skillGutter;
-	//$skillUnitHeight = 22.3;
 	$skillUnitHeight = $skillBoxHeight/2;
 
-	$skillFullWidth = $sectionWidth;
+	$skillFullWidth = $def["width"];
 	$skillModeWidth = 156;
 	$skillModeSkip = $skillModeWidth+BOX_MARGIN;
 	$skillRankWidth = $skillFullWidth - 3*$skillModeSkip;
 	$skillRankSkip = $skillRankWidth+BOX_MARGIN;
 
-	$groupSkills = mkSectionGroup("SKILL MODES", $x, $y, $width, $height);
+	$group = mkSectionGroup($def);
 	$groupModes = XML_SVG_Group::getNew(0,BOX_SKIPY);
 	setTransform($groupModes);
 
@@ -411,8 +431,8 @@ function mkSectionSkillMode($x, $y, $width, $height) {
 				mkLabel("Superb (+5)" ,0,0*$skillBoxSkip,$skillFullWidth-2*$skillModeSkip, 0.5*$skillBoxSkip, true),
 				mkLabel("Great (+4)"  ,0,1*$skillBoxSkip,$skillFullWidth-$skillModeSkip, 0.5*$skillBoxSkip, true),
 				mkLabel("Good (+3)"   ,0,2*$skillBoxSkip,$skillFullWidth, 0.5*$skillBoxSkip, true),
-				mkLabel("Fair (+2)"   ,$skillRankSkip,3.25*$skillBoxSkip,$skillFullWidth-$skillRankSkip, 0.5*$skillBoxSkip, true),
-				mkLabel("Average (+1)",$skillRankSkip+$skillModeSkip,4.25*$skillBoxSkip,$skillFullWidth-$skillRankSkip-$skillModeSkip, 0.5*$skillBoxSkip, true),
+				mkLabel("Fair (+2)"   ,$skillRankSkip,3.0*$skillBoxSkip,$skillFullWidth-$skillRankSkip, 0.5*$skillBoxSkip, true),
+				mkLabel("Average (+1)",$skillRankSkip+$skillModeSkip,4.0*$skillBoxSkip,$skillFullWidth-$skillRankSkip-$skillModeSkip, 0.5*$skillBoxSkip, true),
 				));
 
 	$groupSkillModeGood = XML_SVG_Group::getNew($skillRankSkip,0);
@@ -442,7 +462,7 @@ function mkSectionSkillMode($x, $y, $width, $height) {
 				$groupSkillModeFair,
 				$groupSkillModeAverage,
 				));
-	$groupSkills->appendChildren($groupModes);
+	$group->appendChildren($groupModes);
 
 	// skill points
 	$groupSkillPoints = XML_SVG_Group::getNew(0, 5.5*$skillBoxSkip);
@@ -450,9 +470,9 @@ function mkSectionSkillMode($x, $y, $width, $height) {
 	$groupSkillPoints->appendChildren(array(
 				mkLabel("skillpoints" ,0,0*$skillBoxSkip,$skillFullWidth-2*$skillModeSkip, 0.5*$skillBoxSkip, true),
 				));
-	$groupSkills->appendChild($groupSkillPoints);
+	$group->appendChild($groupSkillPoints);
 
-	return $groupSkills;
+	return $group;
 }
 
 /**
@@ -488,24 +508,11 @@ function mkSkillModeSkills($x, $y, $base, $even=false) {
  * @return XML_SVG_Group containing a Rect and optionally a Text.
  */
 function mkOpenBox($label, $right_of, $below_of, $width, $height = BOX_HEIGHT, $active = true, $shaded=false) {
-	/*
-		 if ($dx != 0) {
-		 $dx += BOX_MARGIN;
-		 }
-		 if ($dy != 0) {
-		 $dy += BOX_MARGIN;
-		 }
-		 $x = $dx;
-		 $y = $dy;
-	 */
 	$group =  XML_SVG_Group::getNew($right_of, $below_of, BOX_MARGIN);
 	$group->id = "openBox-" . str_replace(" ", "-", $label);
 	$group->width = $width;
 	$group->height = $height;
-	//$group->right_of = $right_of;
-	//$group->below_of = $below_of;
 	setTransform($group);
-	//$group->transform = "translate($x,$y)";
 
 	$rect = XML_SVG_Rect::getNew(0,0, $width, $height);
 	$rect->fill = $shaded ? "#eee" : "none";
@@ -563,13 +570,13 @@ function mkGuideBox($x, $y, $width, $height) {
 	$group->class = "guide-box";
 	$group->transform = "translate($x,$y)";
 
-	$rect = XML_SVG_Rect::getNew(0,0, $width, $height);
+	$rect = XML_SVG_Rect::getNew(1,1, $width-2, $height-2);
 	$rect->fill = "none";
 	$rect->stroke_width = 1;
 	$rect->stroke = "#0000ff";
 	$group->appendChild($rect);
 
-	$rect = XML_SVG_Rect::getNew(-2,-2, $width+4, $height+4);
+	$rect = XML_SVG_Rect::getNew(-1,-1, $width+2, $height+2);
 	$rect->fill = "none";
 	$rect->stroke_width = 1;
 	$rect->stroke = "#ff0000";
@@ -613,7 +620,7 @@ function setTextProperties(XML_SVG_Element &$element, $class) {
 			$element->fill = "#000";
 			$element->font_family = "Montserrat, sans-serif";
 			$element->font_size = "13pt";
-			$element->y = "15";
+			$element->y = "18";
 			//$element->alignment_baseline = "before-edge";
 			break;
 		case 'stress-number':
