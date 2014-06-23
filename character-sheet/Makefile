@@ -10,6 +10,8 @@ modes: fate_core_character_sheet.modes.pdf ;
 clean: 
 	- rm $(TEMP) $(OUTPUTS) 
 
+.PHONY: default modes clean
+
 pear: fate_core_character_sheet.pdf
 
 %.pdf: %.pdf-from-svg %.meta Makefile
@@ -30,12 +32,12 @@ pear: fate_core_character_sheet.pdf
 .INTERMEDIATE: %.meta
 
 %.modes.meta: %.php
+	php $< --meta > $@
 %.meta: %.php
-
-%.modes.meta %.meta: %.php
 	php $< --meta > $@
 
-PHP_INCLUDES = presets/standard.inc
-fate_core_character_sheet.php : $(PHP_INCLUDES) Makefile
+PHP_INCLUDES = presets/standard.inc includes/sections.inc layouts/standard.inc
+%.php : $(PHP_INCLUDES) Makefile 
+	touch $@
 
 
