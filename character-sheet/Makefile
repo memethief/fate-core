@@ -1,4 +1,5 @@
 ## Make character sheets
+# @todo: create more make targets vor different sheet variants
 
 OUTPUTS = *.pdf *.svg
 TEMP = *.meta *.pdf-from-svg
