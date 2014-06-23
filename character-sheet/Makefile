@@ -12,15 +12,23 @@ pear: fate_core_character_sheet.svg.php
 %.pdf-from-svg: %.svg
 	inkscape --without-gui --file=$< --export-pdf=$@
 
-fate_core_character_sheet_skill_modes.svg: fate_core_character_sheet.svg.php
+.PRECIOUS: %.svg
+%.svg: %.php
 	php $< > $@
+
+#fate_core_character_sheet_skill_modes.svg: fate_core_character_sheet.svg.php
+%.modes.svg: %.php
+	php $< --variant=modes > $@
 
 dlmlib pear :
 	php "$<" > output.svg
 
 # generate PDF metadata and apply it to the PDF
 # todo: parse this from SVG?
-%.meta: %.svg.php
+%.meta: %.php
 	php $< --meta > $@
+
+PHP_INCLUDES = presets/standard.inc
+fate_core_character_sheet.php : $(PHP_INCLUDES)
 
 
