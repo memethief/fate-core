@@ -1,34 +1,41 @@
 ## Make character sheets
 
+OUTPUTS = *.pdf *.svg
+TEMP = *.meta *.pdf-from-svg
+
 default: pear ;
 
-dlmlib: Fate\ Core\ Character\ Sheet.svg.php
+modes: fate_core_character_sheet.modes.pdf ;
 
-pear: fate_core_character_sheet.svg.php
+clean: 
+	- rm $(TEMP) $(OUTPUTS) 
 
-%.pdf: %.pdf-from-svg %.meta
+pear: fate_core_character_sheet.pdf
+
+%.pdf: %.pdf-from-svg %.meta Makefile
 	pdftk $< update_info $(word 2,$^) output $@
 
 %.pdf-from-svg: %.svg
 	inkscape --without-gui --file=$< --export-pdf=$@
 
-.PRECIOUS: %.svg
-%.svg: %.php
-	php $< > $@
-
-#fate_core_character_sheet_skill_modes.svg: fate_core_character_sheet.svg.php
+.PRECIOUS: %.modes.svg %.svg
 %.modes.svg: %.php
 	php $< --variant=modes > $@
 
-dlmlib pear :
-	php "$<" > output.svg
+%.svg: %.php
+	php $< > $@
 
 # generate PDF metadata and apply it to the PDF
 # todo: parse this from SVG?
+.INTERMEDIATE: %.meta
+
+%.modes.meta: %.php
 %.meta: %.php
+
+%.modes.meta %.meta: %.php
 	php $< --meta > $@
 
 PHP_INCLUDES = presets/standard.inc
-fate_core_character_sheet.php : $(PHP_INCLUDES)
+fate_core_character_sheet.php : $(PHP_INCLUDES) Makefile
 
 
