@@ -19,6 +19,7 @@ $boxes['extras'] = _mkBoxStub('EXTRAS');
 $boxes['stunts'] = _mkBoxStub('STUNTS');
 $boxes['stressphysical'] = _mkBoxStub('PHYSICAL STRESS');
 $boxes['stressmental'] = _mkBoxStub('MENTAL STRESS');
+$boxes['consequences'] = _mkBoxStub('CONSEQUENCES');
 
 function _mkBoxStub($labels, $fields = array()) {
 	list ($label, $sublabel) = (is_array($labels) ? $labels : array($labels, null));
