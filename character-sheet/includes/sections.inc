@@ -10,11 +10,11 @@ $boxes = array();
 /* "ID" section.
  * Here we can have player and character name, description, fate points, refresh, stuff like that. Probably a Dresden-style template would be here, or D&D-style character class.
  */
-$boxes['id'] = _mkBoxBoxStub('ID');
+$boxes['id'] = _mkBoxStub('ID');
 
 function _mkBoxStub($labels, $fields = array()) {
 	list ($label, $sublabel) = (is_array($labels) ? $labels : array($labels, null));
-	array_walk('_mkBoxStub', $fields);
+	array_walk($fields, '_mkBoxStub');
 	return array(
 			'label' => $label,
 			'sublabel' => $sublabel,
